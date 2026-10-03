@@ -29,21 +29,16 @@ type Link = (Cell, Cell)
 -- Passages is a collection of unique links, i.e. the list of all open walls
 type Passages = Set.Set Link
 
--- PrngState is the 64-bit state of the PRNG
-type PrngState = Word64
-
 -- | mkLink creates an edge such that (a,b) = (b,a) (the lesser value is first)
 mkLink :: Cell -> Cell -> Link
 mkLink a b = if a < b then (a, b) else (b, a)
 
--- | Functions for random numbers and simulated BASIC-like behaviors
---
--- As one would expect, Haskell and BASIC differ on treatment of data.  These
--- functions bridge that gap without fully giving in to BASIC's neolithic ways.
+-- | Functions for random numbers and simulating BASIC-like-but-not-quite
+-- behaviors
 
--- Pseudo Random Number Generation isn't included with a plain ghc
+-- | Pseudo Random Number Generation isn't included with a plain ghc
 -- install. This PRNG is based on splitmix 64-bit.
-nextRnd :: PrngState -> (Word64, PrngState)
+nextRnd :: Word64 -> (Word64, Word64)
 nextRnd !s0 =
   let !s1 = s0 + 0x9E3779B97F4A7C15
       !z1 = (s1 `xor` (s1 `shiftR` 30)) * 0xBF58476D1CE4E5B9
@@ -51,8 +46,8 @@ nextRnd !s0 =
       !s2 = z2 `xor` (z2 `shiftR` 31)
    in (s2, s1)
 
--- rndN computes the a random number indexing the range [0, n - 1]
-rndN :: Int -> PrngState -> (Int, PrngState)
+-- | rndN computes the a random number indexing the range [0, n - 1]
+rndN :: Int -> Word64 -> (Int, Word64)
 rndN n s =
   let (v, s') = nextRnd s
    in (fromIntegral (v `mod` fromIntegral n), s')
@@ -61,7 +56,8 @@ rndN n s =
 tab :: Int -> String
 tab n = replicate n ' '
 
--- | Prompt user for and Read a pair of integers.
+-- | Prompt user, read, and parse a pair of integers. Has an additional quirk
+-- that space separated dimensions are also accepted.
 inputPair :: String -> IO (Int, Int)
 inputPair = go []
   where
@@ -79,7 +75,7 @@ inputPair = go []
     uncomma ',' = ' '
     uncomma c = c
 
--- | Prompt user and read dimensions
+-- | Prompt user, read, and validate dimensions
 promptDims :: String -> IO (Int, Int)
 promptDims p = do
   (h, v) <- inputPair p
