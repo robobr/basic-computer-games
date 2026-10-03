@@ -10,7 +10,7 @@ import Data.Ix (inRange)
 import qualified Data.Set as Set
 import Data.Word (Word64)
 import GHC.Clock (getMonotonicTimeNSec)
-import System.IO (hFlush, stdout)
+-- import System.IO (hFlush, stdout)
 import Text.Read (readMaybe)
 
 -- | Data types
@@ -32,8 +32,7 @@ type Passages = Set.Set Link
 -- PrngState is the 64-bit state of the PRNG
 type PrngState = Word64
 
--- mkLink creates an edge such that (a,b) = (b,a), i.e. the lesser value is
--- first.
+-- | mkLink creates an edge such that (a,b) = (b,a) (the lesser value is first)
 mkLink :: Cell -> Cell -> Link
 mkLink a b = if a < b then (a, b) else (b, a)
 
@@ -58,42 +57,39 @@ rndN n s =
   let (v, s') = nextRnd s
    in (fromIntegral (v `mod` fromIntegral n), s')
 
--- tab returns given the number of spaces for ease of text print formatting
+-- | tab returns given the number of spaces for print formatting
 tab :: Int -> String
 tab n = replicate n ' '
 
--- readInts parses a comma separated list of numbers into a list of ints
-readInts :: String -> Maybe [Int]
-readInts = traverse readMaybe . words . each
+-- | Prompt user for and Read a pair of integers.
+inputPair :: String -> IO (Int, Int)
+inputPair = go []
   where
-    each = map (\c -> if c == ',' then ' ' else c)
-
--- promptDims prompts for and parses dimensional input from the user.  It
--- abides the common error cases of BASIC's input.  It's not exact, but the
--- spirit is there.
-promptDims :: String -> IO (Int, Int)
-promptDims prompt = retry prompt []
-  where
-    retry rp acc = do
+    go acc rp = do
       putStr rp
-      hFlush stdout
       line <- getLine
-      case readInts line of
+      case (acc ++) <$> traverse readMaybe (words (map uncomma line)) of
         Nothing -> do
           putStrLn "!NUMBER EXPECTED - RETRY INPUT LINE"
-          retry "? " acc
-        Just vs ->
-          case acc ++ vs of
-            h : v : rest -> do
-              unless (null rest) $ putStrLn "!EXTRA INPUT IGNORED"
-              if h < 2 || v < 2
-                then do
-                  putStrLn "MEANINGLESS DIMENSIONS.  TRY AGAIN."
-                  retry prompt []
-                else return (h, v)
-            partial -> retry "?? " partial
+          go acc "? "
+        Just (a : b : rest) -> do
+          unless (null rest) $ putStrLn "!EXTRA INPUT IGNORED"
+          pure (a, b)
+        Just partial -> go partial "?? "
+    uncomma ',' = ' '
+    uncomma c = c
 
--- Haskell's main is like any other main only more so
+-- | Prompt user and read dimensions
+promptDims :: String -> IO (Int, Int)
+promptDims p = do
+  (h, v) <- inputPair p
+  if h >= 2 && v >= 2
+    then pure (h, v)
+    else do
+      putStrLn "MEANINGLESS DIMENSIONS.  TRY AGAIN."
+      promptDims p
+
+-- | Haskell main is like any other main only more so
 main :: IO ()
 main = do
   -- print the title and prompt for maze dimensions
@@ -111,8 +107,8 @@ main = do
   putStrLn "\n\n\n"
   putStr $ showMaze w h maze
 
--- generateMaze carves passages across a grid of given dimension.  the
--- algorithm used is recursive backtracking.
+-- | generateMaze carves passages across a grid of given dimension using
+-- recursive backtracking algorithm.
 generateMaze :: Word64 -> Int -> Int -> Passages
 generateMaze seed width height =
   go seed (Set.singleton (0, 0)) [(0, 0)] Set.empty
@@ -165,7 +161,7 @@ generateMaze seed width height =
         unvisitedNeighbors (x, y) =
           filter (`Set.notMember` visited) $ allNeighbors (x, y)
 
---
+-- | Convert the maze into it's printable ascii format
 showMaze :: Int -> Int -> Passages -> String
 showMaze width height passages =
   unlines $ topLine : wallsAndFloors
